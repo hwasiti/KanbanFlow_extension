@@ -3,6 +3,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+Add-Type -AssemblyName System.IO.Compression
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $distRoot = Join-Path $repoRoot "dist"
@@ -41,6 +42,57 @@ function Copy-ExtensionFiles {
   Copy-Item -LiteralPath $ManifestPath -Destination (Join-Path $Destination "manifest.json")
 }
 
+function New-ExtensionArchive {
+  param(
+    [Parameter(Mandatory)][string]$SourceDirectory,
+    [Parameter(Mandatory)][string]$DestinationPath
+  )
+
+  $sourceRoot =
+    [System.IO.Path]::GetFullPath($SourceDirectory).TrimEnd([char[]]"\/") +
+    [System.IO.Path]::DirectorySeparatorChar
+  $archiveStream = [System.IO.File]::Open(
+    $DestinationPath,
+    [System.IO.FileMode]::CreateNew,
+    [System.IO.FileAccess]::Write,
+    [System.IO.FileShare]::None
+  )
+
+  try {
+    $archive = [System.IO.Compression.ZipArchive]::new(
+      $archiveStream,
+      [System.IO.Compression.ZipArchiveMode]::Create,
+      $false
+    )
+
+    try {
+      Get-ChildItem -LiteralPath $SourceDirectory -File -Recurse | ForEach-Object {
+        $entryName = $_.FullName.Substring($sourceRoot.Length).Replace("\", "/")
+        $entry = $archive.CreateEntry(
+          $entryName,
+          [System.IO.Compression.CompressionLevel]::Optimal
+        )
+        $entryStream = $entry.Open()
+        $fileStream = [System.IO.File]::OpenRead($_.FullName)
+
+        try {
+          $fileStream.CopyTo($entryStream)
+        }
+        finally {
+          $fileStream.Dispose()
+          $entryStream.Dispose()
+        }
+      }
+    }
+    finally {
+      $archive.Dispose()
+    }
+  }
+  finally {
+    $archiveStream.Dispose()
+  }
+}
+
 $chromeDir = Join-Path $distRoot "chrome"
 $firefoxDir = Join-Path $distRoot "firefox"
 Reset-BuildDirectory -Path $chromeDir
@@ -54,8 +106,8 @@ if (-not $SkipPackages) {
 
   $chromeZip = Join-Path $releaseRoot "kanbanflow-insert-above-chrome-$version.zip"
   $firefoxZip = Join-Path $releaseRoot "kanbanflow-insert-above-firefox-$version.zip"
-  Compress-Archive -Path (Join-Path $chromeDir "*") -DestinationPath $chromeZip -CompressionLevel Optimal
-  Compress-Archive -Path (Join-Path $firefoxDir "*") -DestinationPath $firefoxZip -CompressionLevel Optimal
+  New-ExtensionArchive -SourceDirectory $chromeDir -DestinationPath $chromeZip
+  New-ExtensionArchive -SourceDirectory $firefoxDir -DestinationPath $firefoxZip
 }
 
 Write-Host "Built Chrome extension: $chromeDir"
