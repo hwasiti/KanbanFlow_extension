@@ -152,12 +152,6 @@
         clientY
       })
     );
-
-    window.setTimeout(() => {
-      if (!document.querySelector('input[placeholder="Task name..."]')) {
-        showError("KanbanFlow did not open the task form. Refresh the board and try again.");
-      }
-    }, 300);
   }
 
   function showError(message) {
