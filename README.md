@@ -31,7 +31,10 @@ scripts/build.ps1          Builds unpacked folders and store ZIPs
 dist/                      Generated unpacked builds (ignored by Git)
 releases/                  Generated store packages (ignored by Git)
 docs/publishing-research.md Official-source publishing research
+store-assets/               Ready-to-upload Chrome and Firefox listing artwork
 ```
+
+See `store-assets/README.md` for the exact icon, promotional tile, and screenshots to upload to each store.
 
 ## Build
 
