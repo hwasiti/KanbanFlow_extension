@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "KanbanFlow: Add Task Above",
-  "version": "1.0.1",
-  "description": "Adds an Add task above command to KanbanFlow task-card context menus.",
+  "version": "1.1.0",
+  "description": "Adds insert-above commands to KanbanFlow task and subtask menus.",
   "content_scripts": [
     {
       "matches": [
