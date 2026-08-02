@@ -6,12 +6,11 @@ It uses KanbanFlow's own task form and insertion behavior. It does not store cre
 
 ## Install
 
-1. Extract the ZIP file if you downloaded the packaged copy.
-2. Open `chrome://extensions` in Chrome.
-3. Turn on **Developer mode** in the top-right corner.
-4. Click **Load unpacked**.
-5. Select the `kanbanflow-add-task-above` folder (the folder containing `manifest.json`).
-6. Refresh any KanbanFlow board tabs that were already open.
+1. Open `chrome://extensions` in Chrome.
+2. Turn on **Developer mode** in the top-right corner.
+3. Click **Load unpacked**.
+4. Select `E:\Projects\KanbanFlow_extension` (the folder containing `manifest.json`).
+5. Refresh any KanbanFlow board tabs that were already open.
 
 ## Use
 
@@ -21,6 +20,16 @@ It uses KanbanFlow's own task form and insertion behavior. It does not store cre
 4. Click **Save & close** (or another save option).
 
 The new task is inserted immediately above the card you right-clicked.
+
+## Test in Chrome
+
+1. Open a KanbanFlow board and choose an existing task as the target.
+2. Right-click that task and confirm **Add task above** appears at the top of KanbanFlow's menu.
+3. Choose **Add task above**, enter `Extension test`, and click **Save & close**.
+4. Confirm the new task is directly above the target task.
+5. Delete the temporary `Extension test` task when finished.
+
+After changing extension source files, click the extension's **Reload** button on `chrome://extensions`, then refresh the KanbanFlow board tab before retesting.
 
 ## Compatibility note
 
