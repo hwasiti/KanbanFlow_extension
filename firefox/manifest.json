@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "KanbanFlow: Add Task Above",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Adds insert-above commands to KanbanFlow task and subtask menus.",
   "icons": {
     "16": "icons/icon-16.png",

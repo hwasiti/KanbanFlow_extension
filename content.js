@@ -8,17 +8,16 @@
   const TASK_LIST_SELECTOR = ".taskList";
   const SUBTASK_SELECTOR = "li.taskDetails-subTask[data-subtasklocalid]";
   const SUBTASK_MORE_SELECTOR = "button.taskDetails-subTaskMore";
+  const TASK_DETAILS_ADD_SELECTOR = "button.taskDetails-sidebar-addButton";
+  const TASK_DETAILS_CLOSE_SELECTOR = "button.taskDetails-close";
   const ADD_SUBTASK_SELECTOR =
     '#taskDetails-subTasksSection textarea[placeholder="Add subtask..."]';
-  const TOUCH_TASK_BUTTON_CLASS = "kfa-touch-add-task-above";
-  const TOUCH_POINTER_QUERY = "(hover: none), (pointer: coarse)";
 
   let menuObserver = null;
   let observerTimeout = null;
   let newSubtaskObserver = null;
   let newSubtaskTimeout = null;
-  let touchTaskObserver = null;
-  let touchRefreshFrame = null;
+  let activeTaskId = null;
 
   document.addEventListener(
     "contextmenu",
@@ -34,18 +33,27 @@
         return;
       }
 
-      watchForTaskMenu(task.dataset.taskid);
+      activeTaskId = task.dataset.taskid || null;
+      watchForTaskMenu(activeTaskId);
     },
     true
   );
-
-  initializeTouchTaskControls();
 
   document.addEventListener(
     "click",
     (event) => {
       const target = event.target;
       if (!(target instanceof Element)) {
+        return;
+      }
+
+      const task = target.closest(TASK_SELECTOR);
+      if (task?.dataset.taskid) {
+        activeTaskId = task.dataset.taskid;
+      }
+
+      if (target.closest(TASK_DETAILS_ADD_SELECTOR)) {
+        watchForTaskDetailsMenu(resolveOpenTaskId());
         return;
       }
 
@@ -61,7 +69,11 @@
   );
 
   function watchForTaskMenu(taskId) {
-    watchForMenu((menu) => injectTaskMenuItem(menu, taskId));
+    watchForMenu((menu) => injectTaskMenuItem(menu, taskId, false));
+  }
+
+  function watchForTaskDetailsMenu(taskId) {
+    watchForMenu((menu) => injectTaskMenuItem(menu, taskId, true));
   }
 
   function watchForSubtaskMenu(subtaskId) {
@@ -111,7 +123,7 @@
     );
   }
 
-  function injectTaskMenuItem(menu, taskId) {
+  function injectTaskMenuItem(menu, taskId, fromTaskDetails) {
     if (menu.querySelector(`.${TASK_MENU_ITEM_CLASS}`)) {
       return;
     }
@@ -120,6 +132,16 @@
       className: TASK_MENU_ITEM_CLASS,
       label: "Add task above",
       onClick: () => {
+        if (!taskId) {
+          showError("The open task could not be identified. Close it and try again.");
+          return;
+        }
+
+        if (fromTaskDetails) {
+          openAddTaskDialogAboveFromDetails(taskId);
+          return;
+        }
+
         openAddTaskDialogAbove(taskId);
       }
     });
@@ -215,68 +237,92 @@
     );
   }
 
-  function initializeTouchTaskControls() {
-    const hasTouchInput =
-      navigator.maxTouchPoints > 0 || window.matchMedia(TOUCH_POINTER_QUERY).matches;
+  async function openAddTaskDialogAboveFromDetails(taskId) {
+    const taskDetails = document.querySelector(".taskDetails");
+    const closeButton = taskDetails?.querySelector(TASK_DETAILS_CLOSE_SELECTOR);
 
-    if (!hasTouchInput) {
-      return;
-    }
+    if (taskDetails && closeButton) {
+      closeButton.click();
+      const closed = await waitForElementRemoval(taskDetails, 1500);
 
-    refreshTouchTaskControls();
-    touchTaskObserver = new MutationObserver(scheduleTouchTaskRefresh);
-    touchTaskObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-  }
-
-  function scheduleTouchTaskRefresh() {
-    if (touchRefreshFrame !== null) {
-      return;
-    }
-
-    touchRefreshFrame = window.requestAnimationFrame(() => {
-      touchRefreshFrame = null;
-      refreshTouchTaskControls();
-    });
-  }
-
-  function refreshTouchTaskControls() {
-    document.querySelectorAll(TASK_SELECTOR).forEach((task) => {
-      if (task.querySelector(`.${TOUCH_TASK_BUTTON_CLASS}`)) {
+      if (!closed) {
+        showError("KanbanFlow did not close the task details. Please try again.");
         return;
       }
+    }
 
-      const taskId = task.getAttribute("data-taskid");
-      if (!taskId) {
-        return;
-      }
+    openAddTaskDialogAbove(taskId);
+  }
 
-      const taskName = task.querySelector(".task-name")?.textContent?.trim();
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = TOUCH_TASK_BUTTON_CLASS;
-      button.textContent = "+↑";
-      button.title = "Add task above";
-      button.setAttribute(
-        "aria-label",
-        taskName ? `Add task above ${taskName}` : "Add task above"
+  function resolveOpenTaskId() {
+    const openTaskName = document
+      .querySelector(".taskDetails-name")
+      ?.textContent?.trim();
+
+    if (!openTaskName) {
+      return null;
+    }
+
+    const activeTask = activeTaskId ? findTask(activeTaskId) : null;
+    if (
+      activeTask?.querySelector(".task-name")?.textContent?.trim() ===
+      openTaskName
+    ) {
+      return activeTaskId;
+    }
+
+    const matchingTasks = Array.from(
+      document.querySelectorAll(TASK_SELECTOR)
+    ).filter(
+      (task) =>
+        task.querySelector(".task-name")?.textContent?.trim() === openTaskName
+    );
+
+    if (matchingTasks.length !== 1) {
+      return null;
+    }
+
+    activeTaskId = matchingTasks[0].dataset.taskid || null;
+    return activeTaskId;
+  }
+
+  function findTask(taskId) {
+    return Array.from(document.querySelectorAll(TASK_SELECTOR)).find(
+      (task) => task.dataset.taskid === taskId
+    );
+  }
+
+  function waitForElementRemoval(element, timeoutMs) {
+    if (!element.isConnected) {
+      return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let observer = null;
+      let timeout = null;
+      const finish = (removed) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        observer.disconnect();
+        window.clearTimeout(timeout);
+        resolve(removed);
+      };
+
+      observer = new MutationObserver(() => {
+        if (!element.isConnected) {
+          finish(true);
+        }
+      });
+      timeout = window.setTimeout(
+        () => finish(!element.isConnected),
+        timeoutMs
       );
 
-      for (const eventName of ["pointerdown", "mousedown", "touchstart"]) {
-        button.addEventListener(eventName, (event) => event.stopPropagation(), {
-          passive: true
-        });
-      }
-
-      button.addEventListener("click", (event) => {
-        consumeEvent(event);
-        openAddTaskDialogAbove(taskId);
-      });
-
-      task.classList.add("kfa-touch-task-controls");
-      task.append(button);
+      observer.observe(document.body, { childList: true, subtree: true });
     });
   }
 
