@@ -10,11 +10,15 @@
   const SUBTASK_MORE_SELECTOR = "button.taskDetails-subTaskMore";
   const ADD_SUBTASK_SELECTOR =
     '#taskDetails-subTasksSection textarea[placeholder="Add subtask..."]';
+  const TOUCH_TASK_BUTTON_CLASS = "kfa-touch-add-task-above";
+  const TOUCH_POINTER_QUERY = "(hover: none), (pointer: coarse)";
 
   let menuObserver = null;
   let observerTimeout = null;
   let newSubtaskObserver = null;
   let newSubtaskTimeout = null;
+  let touchTaskObserver = null;
+  let touchRefreshFrame = null;
 
   document.addEventListener(
     "contextmenu",
@@ -34,6 +38,8 @@
     },
     true
   );
+
+  initializeTouchTaskControls();
 
   document.addEventListener(
     "click",
@@ -207,6 +213,71 @@
         clientY
       })
     );
+  }
+
+  function initializeTouchTaskControls() {
+    const hasTouchInput =
+      navigator.maxTouchPoints > 0 || window.matchMedia(TOUCH_POINTER_QUERY).matches;
+
+    if (!hasTouchInput) {
+      return;
+    }
+
+    refreshTouchTaskControls();
+    touchTaskObserver = new MutationObserver(scheduleTouchTaskRefresh);
+    touchTaskObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  function scheduleTouchTaskRefresh() {
+    if (touchRefreshFrame !== null) {
+      return;
+    }
+
+    touchRefreshFrame = window.requestAnimationFrame(() => {
+      touchRefreshFrame = null;
+      refreshTouchTaskControls();
+    });
+  }
+
+  function refreshTouchTaskControls() {
+    document.querySelectorAll(TASK_SELECTOR).forEach((task) => {
+      if (task.querySelector(`.${TOUCH_TASK_BUTTON_CLASS}`)) {
+        return;
+      }
+
+      const taskId = task.getAttribute("data-taskid");
+      if (!taskId) {
+        return;
+      }
+
+      const taskName = task.querySelector(".task-name")?.textContent?.trim();
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = TOUCH_TASK_BUTTON_CLASS;
+      button.textContent = "+↑";
+      button.title = "Add task above";
+      button.setAttribute(
+        "aria-label",
+        taskName ? `Add task above ${taskName}` : "Add task above"
+      );
+
+      for (const eventName of ["pointerdown", "mousedown", "touchstart"]) {
+        button.addEventListener(eventName, (event) => event.stopPropagation(), {
+          passive: true
+        });
+      }
+
+      button.addEventListener("click", (event) => {
+        consumeEvent(event);
+        openAddTaskDialogAbove(taskId);
+      });
+
+      task.classList.add("kfa-touch-task-controls");
+      task.append(button);
+    });
   }
 
   function prepareAddSubtaskAbove(targetSubtaskId) {
